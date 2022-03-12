@@ -1,0 +1,22 @@
+[package]
+name = "twitter-bot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8.4"
+vtext = "0.2.0"
+lazy_static = "1.4.0"
+regex = "1"
+reqwest = { version = "0.11", features = ["blocking", "json", "multipart"] }
+tokio = { version = "1", features = ["full"] }
+oauth = { version = "0.5", package = "oauth1-request" }
+bincode = "1.3.3"
+serde = "1.0.136"
+serde_json = "1.0.64"
+oauth2 = { version = "4.1", features = ["pkce-plain"] }
+anyhow = "1.0"
+url = "2.2.2"
+
