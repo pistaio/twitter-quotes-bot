@@ -14,6 +14,7 @@ pub fn select_random_quote(file_path: &str) -> String {
     // Remove empty quotes
     quotes.retain(|x| *x != "");
 
+    // TODO: Check possible values
     let mut range = rand::thread_rng();
 
     let random_quote = quotes

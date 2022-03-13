@@ -1,0 +1,6 @@
+> Here are some summary points that you should keep in mind as you seek to understand the Information Revolution:
+> 1. A shift in the megapolitical foundations of power normally unfolds far in advance of the actual revolutions in the use of power.
+> 2. Incomes are usually falling when a major transition begins, often because a society has rendered itself crisis-prone by marginalizing resources due to population pressures.
+> 3. Seeing "outside" a system is usually taboo. People are frequently blind to the logic of violence in the existing society; therefore, they are almost always blind to changes in that logic, latent or overt. Megapolitical transitions are seldom recognized before they happen.
+> 4. Major transitions always involve cultural revolutions, and usually entail clashes between adherents of the old and new values.
+> 5. Megapolitical transitions are never popular, because they antiquate painstakingly acquired intellectual capital and confound established moral imperatives. They are not undertaken by popular demand, but in response to changes in the external conditions that alter the logic of violence in the local setting.

@@ -13,7 +13,7 @@ use oauth2::{
 use oauth2::basic::BasicClient;
 use oauth2::reqwest::http_client;
 use reqwest::header::CONTENT_TYPE;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use url::Url;
 
 use reqwest::{self, header::HeaderMap};
@@ -28,13 +28,31 @@ use self::constant::{CLIENT_ID, CLIENT_SECRET};
 
 use std::thread;
 
-#[derive(Serialize)]
-struct Tweet<'a> {
-    text: &'a str,
+#[derive(Serialize, Deserialize)]
+struct TweetRequest {
+    text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reply: Option<TweetReply>
+}
+
+#[derive(Serialize, Deserialize)]
+struct TweetReply {
+    in_reply_to_tweet_id: String 
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TweetResponse {
+    data: Data
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Data {
+    id: String,
+    text: String
 }
 
 // tweet is a vector because it can be a thread
-pub async fn setup_twitter(tweet: Vec<String>) {
+pub async fn setup_twitter(tweets: Vec<String>) {
     let file_path = "data/tokens/twitter.txt";
 
     if !Path::new(file_path).exists() {
@@ -46,19 +64,33 @@ pub async fn setup_twitter(tweet: Vec<String>) {
             .expect("Something went wrong reading the file");
 
         let tokens: Vec<&str> = contents.split("\n").collect();
-        post_tweet(tokens[0], tweet.first().unwrap())
+        let mut index = 0;
+        let mut tweet_id = post_tweet(tokens[0], tweets[0].to_owned(), None)
             .await.expect("Some error");
+        index += 1;
+        while index < tweets.len() {
+            let reply = TweetReply {
+                in_reply_to_tweet_id: tweet_id.unwrap() 
+            };
+
+            tweet_id =  post_tweet(tokens[0], tweets[index].to_owned(), Some(reply))
+                .await.expect("Some error");
+            index += 1;
+        }
     }
 }
 
-async fn post_tweet(access_token: &str, tweet: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn post_tweet(access_token: &str, tweet: String, tweet_id: Option<TweetReply>) 
+    -> Result<Option<String>, Box<dyn std::error::Error>> {
+
     let endpoint = "https://api.twitter.com/2/tweets";
 
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
 
-    let body = Tweet {
-        text: tweet
+    let body = TweetRequest {
+        text: tweet,
+        reply: tweet_id,
     };
 
     let client = reqwest::Client::new();
@@ -72,8 +104,18 @@ async fn post_tweet(access_token: &str, tweet: &str) -> Result<(), Box<dyn std::
 
     let response = request.send().await?;
     println!("{:#?}", response);
+    let response_body: TweetResponse = response.json().await?;
+    println!("{:#?}", response_body);
+    // println!("Status code: {}", response.status()); 
+    println!("response id: {:?}", response_body.data.id);
 
-    Ok(())
+    if let id = response_body.data.id {
+        Ok(Some(id))
+        
+    } else {
+        Ok(None)
+    }
+
 }
 
 fn generate_tokens() {
