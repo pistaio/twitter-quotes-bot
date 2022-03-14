@@ -108,7 +108,7 @@ async fn post_tweet(access_token: &str, refresh_token: &str,
     println!("{:#?}", response);
 
     match response.status() {
-        reqwest::StatusCode::OK => {
+        reqwest::StatusCode::CREATED => {
             let response_body: TweetResponse = response.json().await?;
             println!("{:#?}", response_body);
             // println!("Status code: {}", response.status()); 
