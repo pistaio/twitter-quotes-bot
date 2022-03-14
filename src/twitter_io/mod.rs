@@ -18,6 +18,7 @@ use url::Url;
 
 use reqwest::{self, header::HeaderMap};
 
+use std::collections::HashMap;
 use std::net::TcpListener;
 use std::io::{BufRead, BufReader, Write};
 use std::fs::{self, File};
@@ -65,7 +66,7 @@ pub async fn setup_twitter(tweets: Vec<String>) {
 
         let tokens: Vec<&str> = contents.split("\n").collect();
         let mut index = 0;
-        let mut tweet_id = post_tweet(tokens[0], tweets[0].to_owned(), None)
+        let mut tweet_id = post_tweet(tokens[0], tokens[1], tweets[0].to_owned(), None)
             .await.expect("Some error");
         index += 1;
         while index < tweets.len() {
@@ -73,14 +74,15 @@ pub async fn setup_twitter(tweets: Vec<String>) {
                 in_reply_to_tweet_id: tweet_id.unwrap() 
             };
 
-            tweet_id =  post_tweet(tokens[0], tweets[index].to_owned(), Some(reply))
+            tweet_id =  post_tweet(tokens[0], tokens[1], tweets[index].to_owned(), Some(reply))
                 .await.expect("Some error");
             index += 1;
         }
     }
 }
 
-async fn post_tweet(access_token: &str, tweet: String, tweet_id: Option<TweetReply>) 
+async fn post_tweet(access_token: &str, refresh_token: &str, 
+                    tweet: String, tweet_id: Option<TweetReply>) 
     -> Result<Option<String>, Box<dyn std::error::Error>> {
 
     let endpoint = "https://api.twitter.com/2/tweets";
@@ -104,18 +106,57 @@ async fn post_tweet(access_token: &str, tweet: String, tweet_id: Option<TweetRep
 
     let response = request.send().await?;
     println!("{:#?}", response);
-    let response_body: TweetResponse = response.json().await?;
-    println!("{:#?}", response_body);
-    // println!("Status code: {}", response.status()); 
-    println!("response id: {:?}", response_body.data.id);
 
-    if let id = response_body.data.id {
-        Ok(Some(id))
-        
-    } else {
-        Ok(None)
+    match response.status() {
+        reqwest::StatusCode::OK => {
+            let response_body: TweetResponse = response.json().await?;
+            println!("{:#?}", response_body);
+            // println!("Status code: {}", response.status()); 
+            // println!("response id: {:?}", response_body.data.id);
+            let id = response_body.data.id;
+            Ok(Some(id))
+        },
+        reqwest::StatusCode::UNAUTHORIZED => {
+            // Run refresh token flow
+            println!("Here we are");
+            refresh_access_token(access_token, refresh_token).await
+                .expect("Refresh token flow error");
+            Ok(None)
+        },
+        _ => {
+            // Panic
+            panic!("Uh oh! Something unexpected happened");
+        }
     }
+}
 
+async fn refresh_access_token(access_token: &str, refresh_token: &str) -> Result<(), Box<dyn std::error::Error>>{
+    let mut headers = HeaderMap::new();
+    let val = format!("Basic {}", access_token);
+    headers.insert("Authorization", val.parse().unwrap());
+    let mut params = HashMap::new();
+    params.insert("grant_type", "refresh_token");
+    // params.insert("client_id", CLIENT_ID);
+    params.insert("refresh_token", refresh_token);
+
+    let client = reqwest::Client::new();
+    let request = client.post("https://api.twitter.com/2/oauth2/token")
+        .bearer_auth(access_token)
+        // .headers(headers)
+        .form(&params);
+
+    // println!("{:#?}", request);
+    let response = request
+        .send()
+        .await?;
+    // println!("{:#?}", response);
+
+    // println!("-------------------\n{:#?}", response.text().await?);
+    
+    // save_tokens_to_file(token_result.access_token(), 
+    //         token_result.refresh_token().unwrap());
+
+    Ok(())
 }
 
 fn generate_tokens() {
