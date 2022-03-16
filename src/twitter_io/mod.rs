@@ -8,7 +8,7 @@ use oauth2::{
     RedirectUrl,
     Scope,
     TokenResponse,
-    TokenUrl, AccessToken, RefreshToken
+    TokenUrl, AccessToken, RefreshToken, RefreshTokenRequest, Client, AuthType
 };
 use oauth2::basic::BasicClient;
 use oauth2::reqwest::http_client;
@@ -66,22 +66,24 @@ pub async fn setup_twitter(tweets: Vec<String>) {
 
         let tokens: Vec<&str> = contents.split("\n").collect();
         let mut index = 0;
-        let mut tweet_id = post_tweet(tokens[0], tokens[1], tweets[0].to_owned(), None)
-            .await.expect("Some error");
+        let mut tweet_id = post_tweet(tokens[0].to_owned(), tokens[1].to_owned(), 
+                                      tweets[0].to_owned(), None)
+                            .await.expect("Some error");
         index += 1;
         while index < tweets.len() {
             let reply = TweetReply {
                 in_reply_to_tweet_id: tweet_id.unwrap() 
             };
 
-            tweet_id =  post_tweet(tokens[0], tokens[1], tweets[index].to_owned(), Some(reply))
-                .await.expect("Some error");
+            tweet_id =  post_tweet(tokens[0].to_owned(), tokens[1].to_owned(), 
+                                   tweets[index].to_owned(), Some(reply))
+                            .await.expect("Some error");
             index += 1;
         }
     }
 }
 
-async fn post_tweet(access_token: &str, refresh_token: &str, 
+async fn post_tweet(access_token: String, refresh_token: String, 
                     tweet: String, tweet_id: Option<TweetReply>) 
     -> Result<Option<String>, Box<dyn std::error::Error>> {
 
@@ -98,11 +100,11 @@ async fn post_tweet(access_token: &str, refresh_token: &str,
     let client = reqwest::Client::new();
     let request = client
                     .post(endpoint)
-                    .bearer_auth(access_token)
+                    .bearer_auth(&access_token)
                     .headers(headers)
                     .json(&body);
 
-    println!("{:#?}", request);
+    // println!("{:#?}", request);
 
     let response = request.send().await?;
     println!("{:#?}", response);
@@ -110,7 +112,7 @@ async fn post_tweet(access_token: &str, refresh_token: &str,
     match response.status() {
         reqwest::StatusCode::CREATED => {
             let response_body: TweetResponse = response.json().await?;
-            println!("{:#?}", response_body);
+            // println!("{:#?}", response_body);
             // println!("Status code: {}", response.status()); 
             // println!("response id: {:?}", response_body.data.id);
             let id = response_body.data.id;
@@ -118,9 +120,11 @@ async fn post_tweet(access_token: &str, refresh_token: &str,
         },
         reqwest::StatusCode::UNAUTHORIZED => {
             // Run refresh token flow
-            println!("Here we are");
-            refresh_access_token(access_token, refresh_token).await
-                .expect("Refresh token flow error");
+            println!("----------------Here we are (unauthorized)");
+            thread::spawn(move || {
+                    refresh_access_token(&refresh_token)
+                        .expect("Refresh token flow error");
+                }).join().expect("Thread panicked");
             Ok(None)
         },
         _ => {
@@ -130,32 +134,54 @@ async fn post_tweet(access_token: &str, refresh_token: &str,
     }
 }
 
-async fn refresh_access_token(access_token: &str, refresh_token: &str) -> Result<(), Box<dyn std::error::Error>>{
-    let mut headers = HeaderMap::new();
-    let val = format!("Basic {}", access_token);
-    headers.insert("Authorization", val.parse().unwrap());
+// TODO: Test implemenation
+fn refresh_access_token(refresh_token: &str) -> Result<(), Box<dyn std::error::Error>>{
+    let client_id = ClientId::new(CLIENT_ID.to_string());
+    let client_secret = ClientSecret::new(CLIENT_SECRET.to_string());
+    let auth_url = AuthUrl::new("https://twitter.com/i/oauth2/authorize".to_string())
+        .unwrap();
+    let token_url = TokenUrl::new("https://api.twitter.com/2/oauth2/token".to_string())
+        .unwrap();
+    let token = RefreshToken::new(refresh_token.to_string());
+
+    let client = BasicClient::new(client_id, Some(client_secret), auth_url, Some(token_url))
+        .set_auth_type(AuthType::BasicAuth);
+
+    let token_result = client
+        .exchange_refresh_token(&token)
+        .request(http_client)
+        .expect("Some error");
+
+    println!("{:#?}", token_result);
+
+    println!("{}", token_result.access_token().secret());
+    println!("{}", token_result.refresh_token().unwrap().secret());
+
+    // save_tokens_to_file(token_result.access_token(), 
+            // token_result.refresh_token().unwrap());
+
+    Ok(())
+}
+
+
+pub async fn revoke_access_token(access_token: &str) -> Result<(), Box<dyn std::error::Error>>{
     let mut params = HashMap::new();
-    params.insert("grant_type", "refresh_token");
-    // params.insert("client_id", CLIENT_ID);
-    params.insert("refresh_token", refresh_token);
+    params.insert("token", access_token);
+    params.insert("token_type_hint", "access_token");
 
     let client = reqwest::Client::new();
-    let request = client.post("https://api.twitter.com/2/oauth2/token")
-        .bearer_auth(access_token)
-        // .headers(headers)
+    let request = client.post("https://api.twitter.com/2/oauth2/revoke")
+        .basic_auth(CLIENT_ID, Some(CLIENT_SECRET))
         .form(&params);
 
-    // println!("{:#?}", request);
+    println!("{:#?}", request);
     let response = request
         .send()
         .await?;
-    // println!("{:#?}", response);
+    println!("{:#?}", response);
 
-    // println!("-------------------\n{:#?}", response.text().await?);
+    println!("-------------------\n{:#?}", response.text().await?);
     
-    // save_tokens_to_file(token_result.access_token(), 
-    //         token_result.refresh_token().unwrap());
-
     Ok(())
 }
 
@@ -238,12 +264,12 @@ fn generate_tokens() {
             );
             stream.write_all(response.as_bytes()).unwrap();
 
-            println!("Twitter returned the following code:\n{}\n", code.secret());
-            println!(
-                "Twitter returned the following state:\n{} (expected `{}`)\n",
-                state.secret(),
-                csrf_token.secret()
-            );
+            // println!("Twitter returned the following code:\n{}\n", code.secret());
+            // println!(
+            //     "Twitter returned the following state:\n{} (expected `{}`)\n",
+            //     state.secret(),
+            //     csrf_token.secret()
+            // );
 
             // Now you can trade it for an access token.
             let token_result =
@@ -267,8 +293,8 @@ fn generate_tokens() {
 }
 
 fn save_tokens_to_file(access_token: &AccessToken, refresh_token: &RefreshToken) {
-    println!("{}", refresh_token.secret());
-    println!("{}", access_token.secret());
+    // println!("{}", access_token.secret());
+    // println!("{}", refresh_token.secret());
 
     let mut file = File::create("data/tokens/twitter.txt").expect("Unable to create file");
     writeln!(&mut file, "{}", access_token.secret()).unwrap();

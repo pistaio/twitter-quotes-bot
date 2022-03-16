@@ -21,12 +21,14 @@ async fn main() {
     println!("{}", quote.len());
     println!("{:?}", tweet);
 
+    // twitter_io::revoke_access_token("eFNIMWU1c01vV2R3UVpHaFhUcEZYbFlwVWI0N09uMldJUi1iS2NTamZvcE54OjE2NDc0MDk0ODIyMTQ6MToxOmF0OjE").await.expect("Some error");
+
     twitter_io::setup_twitter(tweet).await;
 }
 
 fn process_markdowns() {
     let path = "data/original";
-    let file_names: Vec<&str> = vec!["chapter_2.md", "chapter_3.md"];
+    let file_names: Vec<&str> = vec!["chapter_2.md", "chapter_3.md", "chapter_4.md", "chapter_5.md"];
 
     let mut file_paths: Vec<String> = Vec::new();
 
