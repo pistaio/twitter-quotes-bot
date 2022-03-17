@@ -7,35 +7,31 @@ mod twitter_io;
 extern crate lazy_static;
 use std::path::Path;
 
+const QUOTES_PATH: &str = "data/processed/quotes.md";
+
 #[tokio::main]
 async fn main() {
-    let quotes_path = "data/processed/quotes.md";
-    if !Path::new(quotes_path).exists() {
-        process_markdowns();
+    if !Path::new(QUOTES_PATH).exists() {
+        process_chapter_markdowns();
     }
 
-    let quote = file_io::select_random_quote(quotes_path);
-
-    let tweet = format_quote::convert_to_tweet(quote.to_owned());
-
-    println!("{}", quote.len());
-    println!("{:?}", tweet);
+    let quote = file_io::select_random_quote(crate::QUOTES_PATH);
 
     // twitter_io::revoke_access_token("eFNIMWU1c01vV2R3UVpHaFhUcEZYbFlwVWI0N09uMldJUi1iS2NTamZvcE54OjE2NDc0MDk0ODIyMTQ6MToxOmF0OjE").await.expect("Some error");
 
-    twitter_io::setup_twitter(tweet).await;
+    twitter_io::tweet_quote(quote).await;
 }
 
-fn process_markdowns() {
+fn process_chapter_markdowns() {
     let path = "data/original";
-    let file_names: Vec<&str> = vec!["chapter_2.md", "chapter_3.md", "chapter_4.md", "chapter_5.md"];
+    let chapter_file_names: Vec<&str> = vec!["chapter_2.md", "chapter_3.md", "chapter_4.md", "chapter_5.md"];
 
-    let mut file_paths: Vec<String> = Vec::new();
+    let mut chapter_paths: Vec<String> = Vec::new();
 
-    for file_name in &file_names {
-        let file_path = format!("{}/{}", path, file_name);
-        file_paths.push(file_path);
+    for chapter_name in &chapter_file_names{
+        let chapter_path = format!("{}/{}", path, chapter_name);
+        chapter_paths.push(chapter_path);
     }
 
-    file_io::generate_quotes_markdown(file_paths);
+    file_io::generate_combined_quotes_markdown(chapter_paths);
 }

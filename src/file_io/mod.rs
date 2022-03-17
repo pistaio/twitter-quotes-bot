@@ -6,61 +6,60 @@ use rand::seq::SliceRandom;
 
 // Randomly select quote for markdown file of quotes
 pub fn select_random_quote(file_path: &str) -> String {
-    let contents = fs::read_to_string(file_path)
-        .expect("Something went wrong reading the file");
-
-    let mut quotes: Vec<String> = contents.split("\n\n").map(|s| s.to_string()).collect();
-
-    // Remove empty quotes
-    quotes.retain(|x| *x != "");
+    let quotes: Vec<String> = read_quotes(file_path);
 
     let mut range = rand::thread_rng();
     let random_quote = quotes
                         .choose(&mut range)
-                        .unwrap() // TODO: If quotes is empty, generate new quotes file
+                        .unwrap()
                         .to_string();
 
-    // Remove quote from quotes.md
-    quotes.retain(|x| *x != random_quote);
-    write_quotes_to_markdown(quotes, Some(&random_quote))
-        .unwrap_or_else(|err| println!("{:?}", err));
-
-    return random_quote.replace("> ", "");
+    println!("Quote length: {}", random_quote.len());
+    return random_quote
 }
 
 
 // Combine chapter markdown files into single markdown file
-pub fn generate_quotes_markdown(file_paths: Vec<String>) {
+pub fn generate_combined_quotes_markdown(chapter_paths: Vec<String>) {
     let mut quotes: Vec<String> = Vec::new();
 
-    for file_path in file_paths {
-        quotes.append(&mut read_markdown(&file_path));
+    for chapter_path in chapter_paths {
+        quotes.append(&mut read_chapter_quotes(&chapter_path));
     }
 
-    write_quotes_to_markdown(quotes.to_owned(), None)
+    write_quotes_to_markdown(quotes.to_owned())
         .unwrap_or_else(|err| println!("{:?}", err));
 }
 
 
-fn read_markdown(file_path: &str) -> Vec<String> {
-    let contents = fs::read_to_string(file_path)
-        .expect("Something went wrong reading the file");
+// Remove quote from markdown once it is tweeted
+pub fn remove_quote_from_markdown(quote: String) {
+    let mut quotes: Vec<String> = read_quotes(crate::QUOTES_PATH);
 
-    return extract_quotes(contents);
+    // Remove quote from file
+    quotes.retain(|x| *x != quote);
+    write_quotes_to_markdown(quotes)
+        .unwrap_or_else(|err| println!("{:?}", err));
 }
 
 
-fn write_quotes_to_markdown(quotes: Vec<String>, quote: Option<&str>) -> std::io::Result<()> {
+fn write_quotes_to_markdown(quotes: Vec<String>) -> std::io::Result<()> {
     let mut file = File::create("data/processed/quotes.md").expect("Unable to create file");
 
-    let random_quote = quote.unwrap_or_else(|| "");
-
     for quote in quotes {
-        if quote != "" && quote != random_quote {
+        if quote != "" {
             writeln!(&mut file, "{}\n", quote).unwrap();
         }
     }
     Ok(())
+}
+
+
+fn read_chapter_quotes(file_path: &str) -> Vec<String> {
+    let contents = fs::read_to_string(file_path)
+        .expect("Something went wrong reading the file");
+
+    return extract_quotes(contents);
 }
 
 
@@ -92,16 +91,31 @@ fn extract_quotes(contents: String) -> Vec<String> {
         token_index += 1
     }
 
-    // for quote in &quotes {
-    //     println!("quote:-----------------------------{}", quote);
-    // }
-
     return quotes;
 }
 
 
 fn is_quote(token: String) -> bool {
     return token.chars().nth(0) == Some('>'); 
+}
+
+
+fn read_quotes(file_path: &str) -> Vec<String> {
+    let contents = fs::read_to_string(file_path)
+        .expect("Something went wrong reading the file");
+
+    let mut quotes: Vec<String> = contents.split("\n\n").map(|s| s.to_string()).collect();
+
+    // Remove empty quotes
+    quotes.retain(|x| *x != "");
+
+    // If quotes.md is empty, generate new quotes file
+    if quotes.len() == 0 {
+        crate::process_chapter_markdowns();
+        return read_quotes(crate::QUOTES_PATH);
+    }
+
+    return quotes
 }
 
 

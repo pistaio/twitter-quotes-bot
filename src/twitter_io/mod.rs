@@ -12,9 +12,9 @@ use oauth2::{
 };
 use oauth2::basic::BasicClient;
 use oauth2::reqwest::http_client;
+use reqwest::Url;
 use reqwest::header::CONTENT_TYPE;
 use serde::{Serialize, Deserialize};
-use url::Url;
 
 use reqwest::{self, header::HeaderMap};
 
@@ -25,6 +25,8 @@ use std::fs::{self, File};
 use std::path::Path;
 
 mod constant;
+use crate::{file_io, format_quote};
+
 use self::constant::{CLIENT_ID, CLIENT_SECRET, REDIRECT_URL};
 
 use std::thread;
@@ -52,22 +54,26 @@ struct Data {
     text: String
 }
 
-// tweet is a vector because it can be a thread
-pub async fn setup_twitter(tweets: Vec<String>) {
-    let file_path = "data/tokens/twitter.txt";
+pub async fn tweet_quote(quote: String) {
+    let tokens_path = "data/tokens/twitter.txt";
 
-    if !Path::new(file_path).exists() {
+    if !Path::new(tokens_path).exists() {
         thread::spawn(move || {
                 generate_tokens();
         }).join().expect("Thread panicked")
     } else {
-        let contents = fs::read_to_string(file_path)
+        // tweets is a vector because it can be a thread
+        let tweets: Vec<String> = format_quote::convert_to_tweet(quote.to_owned());
+
+        println!("{:?}", tweets);
+
+        let contents = fs::read_to_string(tokens_path)
             .expect("Something went wrong reading the file");
 
         let tokens: Vec<&str> = contents.split("\n").collect();
         let mut index = 0;
         let mut tweet_id = post_tweet(tokens[0].to_owned(), tokens[1].to_owned(), 
-                                      tweets[0].to_owned(), None)
+                                      tweets[index].to_owned(), None)
                             .await.expect("Some error");
         index += 1;
         while index < tweets.len() {
@@ -75,11 +81,14 @@ pub async fn setup_twitter(tweets: Vec<String>) {
                 in_reply_to_tweet_id: tweet_id.unwrap() 
             };
 
-            tweet_id =  post_tweet(tokens[0].to_owned(), tokens[1].to_owned(), 
-                                   tweets[index].to_owned(), Some(reply))
-                            .await.expect("Some error");
+            tweet_id = post_tweet(tokens[0].to_owned(), tokens[1].to_owned(), 
+                    tweets[index].to_owned(), Some(reply))
+                .await.expect("Some error");
             index += 1;
         }
+
+        // Only after all tweets have been tweeted, remove quote from file
+        file_io::remove_quote_from_markdown(quote)
     }
 }
 
@@ -104,17 +113,12 @@ async fn post_tweet(access_token: String, refresh_token: String,
                     .headers(headers)
                     .json(&body);
 
-    // println!("{:#?}", request);
-
     let response = request.send().await?;
     println!("{:#?}", response);
 
     match response.status() {
         reqwest::StatusCode::CREATED => {
             let response_body: TweetResponse = response.json().await?;
-            // println!("{:#?}", response_body);
-            // println!("Status code: {}", response.status()); 
-            // println!("response id: {:?}", response_body.data.id);
             let id = response_body.data.id;
             Ok(Some(id))
         },
@@ -164,7 +168,8 @@ fn refresh_access_token(refresh_token: &str) -> Result<(), Box<dyn std::error::E
 }
 
 
-pub async fn revoke_access_token(access_token: &str) -> Result<(), Box<dyn std::error::Error>>{
+pub async fn revoke_access_token(access_token: &str) 
+    -> Result<(), Box<dyn std::error::Error>> {
     let mut params = HashMap::new();
     params.insert("token", access_token);
     params.insert("token_type_hint", "access_token");
@@ -174,14 +179,10 @@ pub async fn revoke_access_token(access_token: &str) -> Result<(), Box<dyn std::
         .basic_auth(CLIENT_ID, Some(CLIENT_SECRET))
         .form(&params);
 
-    println!("{:#?}", request);
-    let response = request
+    let _response = request
         .send()
         .await?;
-    println!("{:#?}", response);
 
-    println!("-------------------\n{:#?}", response.text().await?);
-    
     Ok(())
 }
 
@@ -271,6 +272,8 @@ fn generate_tokens() {
             //     csrf_token.secret()
             // );
 
+            assert!(_state.secret() == _csrf_token.secret());
+
             // Now you can trade it for an access token.
             let token_result =
                 client
@@ -280,9 +283,6 @@ fn generate_tokens() {
                 .request(http_client).expect("Error fetching Access token and Refresh token");
 
             println!("{:#?}", token_result);
-
-            // println!("{}", token_result.access_token().secret());
-            // println!("{}", token_result.refresh_token().unwrap().secret());
 
             save_tokens_to_file(token_result.access_token(), 
                                 token_result.refresh_token().unwrap());

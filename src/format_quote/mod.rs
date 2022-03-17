@@ -7,10 +7,11 @@ const SPACE_LEN: usize = 1;
 
 
 pub fn convert_to_tweet(quote: String) -> Vec<String> {
-    if quote.len() <= 280 {
-        return vec![quote];
+    let formatted_quote = quote.replace("> ", "");
+    if formatted_quote.len() <= 280 {
+        return vec![formatted_quote];
     } else {
-        return split_to_sentences(quote);
+        return split_to_sentences(formatted_quote);
     }
 }
 
@@ -32,10 +33,6 @@ fn split_to_sentences(quote: String) -> Vec<String> {
     while sentence_index < formatted_sentences.len() {
         let curr_sentence_length = formatted_sentences[sentence_index].len();
         let curr_tweet_length = tweet_sentences[tweet_index].len();
-
-        // println!("index: {} {}", sentence_index, tweet_index);
-        // println!("length: {} {}", curr_sentence_length, curr_tweet_length);
-        // println!("{}", sentences[sentence_index]);
 
         if curr_sentence_length <= 280 {
             if curr_tweet_length + curr_sentence_length <= 280 {
@@ -110,9 +107,10 @@ fn split_by_words(sentence: &str) -> Vec<String> {
     return tweet_sized_sentences;
 }
 
+
 // If sentence is just digit full-stop and space, append next sentence
 // with it and remove next sentence from vec
-// TODO: Check if needed - If combined sentence is longer than 280 chars, split it by words
+// TODO: Check if needed -> If combined sentence is longer than 280 chars, split it by words
 fn format_sentences(sentences: Vec<&str>) -> Vec<String> {
     let mut formatted_sentences: Vec<String>  = Vec::new(); 
 
@@ -135,6 +133,7 @@ fn format_sentences(sentences: Vec<&str>) -> Vec<String> {
     return formatted_sentences;
 }
 
+
 fn is_sentence_digit(token: &str) -> bool {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"\d\.\s$").unwrap();
@@ -142,13 +141,6 @@ fn is_sentence_digit(token: &str) -> bool {
     return RE.is_match(token);
 }
 
-fn is_end_of_token_newline(token: &str) -> bool {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r"\n$").unwrap();
-    }
-    return RE.is_match(token);
-    
-}
 
 #[cfg(test)]
 mod test;
