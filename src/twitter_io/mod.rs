@@ -8,7 +8,7 @@ use oauth2::{
     RedirectUrl,
     Scope,
     TokenResponse,
-    TokenUrl, AccessToken, RefreshToken, RefreshTokenRequest, Client, AuthType
+    TokenUrl, AccessToken, RefreshToken, AuthType
 };
 use oauth2::basic::BasicClient;
 use oauth2::reqwest::http_client;
@@ -25,7 +25,7 @@ use std::fs::{self, File};
 use std::path::Path;
 
 mod constant;
-use self::constant::{CLIENT_ID, CLIENT_SECRET};
+use self::constant::{CLIENT_ID, CLIENT_SECRET, REDIRECT_URL};
 
 use std::thread;
 
@@ -157,8 +157,8 @@ fn refresh_access_token(refresh_token: &str) -> Result<(), Box<dyn std::error::E
     println!("{}", token_result.access_token().secret());
     println!("{}", token_result.refresh_token().unwrap().secret());
 
-    // save_tokens_to_file(token_result.access_token(), 
-            // token_result.refresh_token().unwrap());
+    save_tokens_to_file(token_result.access_token(), 
+            token_result.refresh_token().unwrap());
 
     Ok(())
 }
@@ -192,7 +192,7 @@ fn generate_tokens() {
             .expect("Error parsing auth url");
     let token_url = Some(TokenUrl::new("https://api.twitter.com/2/oauth2/token".to_string())
             .expect("Error parsing token url"));
-    let redirect_url = RedirectUrl::new("http://127.0.0.1:8080".to_string())
+    let redirect_url = RedirectUrl::new(REDIRECT_URL.to_string())
             .expect("Unable to parse redirect url");
 
     // Create an OAuth2 client by specifying the client ID, client secret, authorization URL and
@@ -204,7 +204,7 @@ fn generate_tokens() {
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_plain();
 
     // Generate the full authorization URL.
-    let (auth_url, csrf_token) = client
+    let (auth_url, _csrf_token) = client
         .authorize_url(CsrfToken::new_random)
         // Set the desired scopes.
         .add_scope(Scope::new("tweet.read".to_string()))
@@ -219,11 +219,11 @@ fn generate_tokens() {
     // process.
     println!("Browse to: {}", auth_url);
 
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
+    let listener = TcpListener::bind("0.0.0.0:8080").unwrap();
     for stream in listener.incoming() {
         if let Ok(mut stream) = stream {
             let code;
-            let state;
+            let _state;
             {
                 let mut reader = BufReader::new(&stream);
 
@@ -253,7 +253,7 @@ fn generate_tokens() {
                     .unwrap();
 
                 let (_, value) = state_pair;
-                state = CsrfToken::new(value.into_owned());
+                _state = CsrfToken::new(value.into_owned());
             }
 
             let message = "Go back to your terminal :)";
