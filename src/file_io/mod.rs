@@ -9,22 +9,23 @@ pub fn select_random_quote(file_path: &str) -> String {
     let contents = fs::read_to_string(file_path)
         .expect("Something went wrong reading the file");
 
-    let mut quotes: Vec<&str> = contents.split("\n\n").collect();
+    let mut quotes: Vec<String> = contents.split("\n\n").map(|s| s.to_string()).collect();
 
     // Remove empty quotes
     quotes.retain(|x| *x != "");
 
-    // TODO: Check possible values
     let mut range = rand::thread_rng();
-
     let random_quote = quotes
                         .choose(&mut range)
-                        .unwrap()
-                        .replace("> ", "");
+                        .unwrap() // TODO: If quotes is empty, generate new quotes file
+                        .to_string();
 
-    // TODO: Remove quote from quotes.md
+    // Remove quote from quotes.md
+    quotes.retain(|x| *x != random_quote);
+    write_quotes_to_markdown(quotes, Some(&random_quote))
+        .unwrap_or_else(|err| println!("{:?}", err));
 
-    return random_quote.to_string();
+    return random_quote.replace("> ", "");
 }
 
 
@@ -36,7 +37,8 @@ pub fn generate_quotes_markdown(file_paths: Vec<String>) {
         quotes.append(&mut read_markdown(&file_path));
     }
 
-    write_quotes_to_markdown(quotes.to_owned()).unwrap_or_else(|err| println!("{:?}", err));
+    write_quotes_to_markdown(quotes.to_owned(), None)
+        .unwrap_or_else(|err| println!("{:?}", err));
 }
 
 
@@ -48,11 +50,13 @@ fn read_markdown(file_path: &str) -> Vec<String> {
 }
 
 
-fn write_quotes_to_markdown(quotes: Vec<String>) -> std::io::Result<()> {
+fn write_quotes_to_markdown(quotes: Vec<String>, quote: Option<&str>) -> std::io::Result<()> {
     let mut file = File::create("data/processed/quotes.md").expect("Unable to create file");
 
+    let random_quote = quote.unwrap_or_else(|| "");
+
     for quote in quotes {
-        if quote != "" {
+        if quote != "" && quote != random_quote {
             writeln!(&mut file, "{}\n", quote).unwrap();
         }
     }
