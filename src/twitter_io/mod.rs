@@ -30,6 +30,7 @@ use crate::{file_io, format_quote};
 use self::constant::{CLIENT_ID, CLIENT_SECRET, REDIRECT_URL};
 
 use std::thread;
+use async_recursion::async_recursion;
 
 #[derive(Serialize, Deserialize)]
 struct TweetRequest {
@@ -38,7 +39,7 @@ struct TweetRequest {
     reply: Option<TweetReply>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct TweetReply {
     in_reply_to_tweet_id: String 
 }
@@ -72,18 +73,14 @@ pub async fn tweet_quote(quote: String) {
 
         let tokens: Vec<&str> = contents.split("\n").collect();
         let mut index = 0;
-        let mut tweet_id = post_tweet(tokens[0].to_owned(), tokens[1].to_owned(), 
-                                      tweets[index].to_owned(), None)
-                            .await.expect("Some error");
+        let mut tweet_id = handle_post_tweet_response(tokens[0].to_owned(), tokens[1].to_owned(), tweets[index].to_owned(), None).await;
         index += 1;
         while index < tweets.len() {
             let reply = TweetReply {
-                in_reply_to_tweet_id: tweet_id.unwrap() 
+                in_reply_to_tweet_id: tweet_id 
             };
 
-            tweet_id = post_tweet(tokens[0].to_owned(), tokens[1].to_owned(), 
-                    tweets[index].to_owned(), Some(reply))
-                .await.expect("Some error");
+            tweet_id = handle_post_tweet_response(tokens[0].to_owned(), tokens[1].to_owned(), tweets[index].to_owned(), Some(reply)).await;
             index += 1;
         }
 
@@ -92,9 +89,18 @@ pub async fn tweet_quote(quote: String) {
     }
 }
 
+async fn handle_post_tweet_response(access_token: String, refresh_token: String, tweet: String, tweet_id: Option<TweetReply>) -> String {
+    match post_tweet(access_token.clone(), refresh_token.clone(), tweet.clone(), tweet_id.clone()).await {
+        Ok(new_id) => new_id,
+        _ => panic!("dunno what happened!")
+    }
+}
+
+// TODO: Test refresh token flow. It should fetch new tokens and post tweet in a single go. 
+#[async_recursion(?Send)]
 async fn post_tweet(access_token: String, refresh_token: String, 
                     tweet: String, tweet_id: Option<TweetReply>) 
-    -> Result<Option<String>, Box<dyn std::error::Error>> {
+    -> Result<String, Box<dyn std::error::Error>> {
 
     let endpoint = "https://api.twitter.com/2/tweets";
 
@@ -102,8 +108,8 @@ async fn post_tweet(access_token: String, refresh_token: String,
     headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
 
     let body = TweetRequest {
-        text: tweet,
-        reply: tweet_id,
+        text: tweet.clone(),
+        reply: tweet_id.clone(),
     };
 
     let client = reqwest::Client::new();
@@ -120,16 +126,18 @@ async fn post_tweet(access_token: String, refresh_token: String,
         reqwest::StatusCode::CREATED => {
             let response_body: TweetResponse = response.json().await?;
             let id = response_body.data.id;
-            Ok(Some(id))
+            Ok(id)
         },
         reqwest::StatusCode::UNAUTHORIZED => {
             // Run refresh token flow
             println!("----------------Here we are (unauthorized)");
+            let ref_token = refresh_token.clone();
             thread::spawn(move || {
-                    refresh_access_token(&refresh_token)
+                    refresh_access_token(&ref_token)
                         .expect("Refresh token flow error");
                 }).join().expect("Thread panicked");
-            Ok(None)
+            post_tweet(access_token, refresh_token, tweet, tweet_id).await
+            // Ok(None)
         },
         _ => {
             // Panic
@@ -138,7 +146,6 @@ async fn post_tweet(access_token: String, refresh_token: String,
     }
 }
 
-// TODO: Test implemenation
 fn refresh_access_token(refresh_token: &str) -> Result<(), Box<dyn std::error::Error>>{
     let client_id = ClientId::new(CLIENT_ID.to_string());
     let client_secret = ClientSecret::new(CLIENT_SECRET.to_string());
