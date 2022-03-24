@@ -9,8 +9,8 @@ use std::path::Path;
 
 const QUOTES_PATH: &str = "data/processed/quotes.md";
 
-#[tokio::main]
-async fn main() {
+// #[tokio::main]
+fn main() {
     if !Path::new(QUOTES_PATH).exists() {
         process_chapter_markdowns();
     }
@@ -19,7 +19,7 @@ async fn main() {
 
     // twitter_io::revoke_access_token("eFNIMWU1c01vV2R3UVpHaFhUcEZYbFlwVWI0N09uMldJUi1iS2NTamZvcE54OjE2NDc0MDk0ODIyMTQ6MToxOmF0OjE").await.expect("Some error");
 
-    twitter_io::tweet_quote(quote).await;
+    twitter_io::tweet_quote(quote);
 }
 
 fn process_chapter_markdowns() {
