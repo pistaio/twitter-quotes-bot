@@ -93,7 +93,7 @@ pub fn tweet_quote(quote: String) {
 fn handle_post_tweet_response(access_token: String, refresh_token: String, tweet: String, tweet_id: Option<TweetReply>) -> String {
     match post_tweet(access_token.clone(), refresh_token.clone(), tweet.clone(), tweet_id.clone()) {
         Ok(new_id) => new_id,
-        Err(e) => { eprintln!("{}", e); panic!("dunno what happened!") }
+        Err(e) => { panic!("Error: {}", e) }
     }
 }
 
