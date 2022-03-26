@@ -13,23 +13,20 @@ use oauth2::{
 use oauth2::basic::BasicClient;
 use oauth2::reqwest::http_client;
 use reqwest::Url;
-use reqwest::header::CONTENT_TYPE;
+use reqwest::header::{CONTENT_TYPE, HeaderMap};
 use serde::{Serialize, Deserialize};
-
-use reqwest::{self, header::HeaderMap};
 
 use std::collections::HashMap;
 use std::net::TcpListener;
 use std::io::{BufRead, BufReader, Write};
 use std::fs::{self, File};
 use std::path::Path;
+use std::thread;
 
-mod constant;
 use crate::{file_io, format_quote};
 
+mod constant;
 use self::constant::{CLIENT_ID, CLIENT_SECRET, REDIRECT_URL};
-
-use std::thread;
 
 const TOKENS_PATH: &str = "data/tokens/twitter.txt";
 
@@ -104,14 +101,17 @@ pub fn tweet_quote(quote: String) {
     }
 }
 
-fn handle_post_tweet_response(token: Token, tweet: String, tweet_id: Option<TweetReply>) -> (String, Token) {
+fn handle_post_tweet_response(
+    token: Token, 
+    tweet: String, 
+    tweet_id: Option<TweetReply>
+) -> (String, Token) {
     match post_tweet(token, tweet.clone(), tweet_id.clone()) {
         Ok(response) => response,
         Err(e) => { panic!("Error: {}", e) }
     }
 }
 
-// TODO: Test refresh token flow. It should fetch new tokens and post tweet in a single go. 
 fn post_tweet(token: Token, tweet: String, tweet_id: Option<TweetReply>) 
     -> Result<(String, Token), Box<dyn std::error::Error>> {
 
@@ -193,9 +193,8 @@ fn refresh_access_token(refresh_token: RefreshToken) -> Result<Token, Box<dyn st
     // Ok((access_token.secret().clone(), refresh_token.secret().clone()))
 }
 
-
-pub fn revoke_access_token(access_token: &str) 
-    -> Result<(), Box<dyn std::error::Error>> {
+#[allow(dead_code)]
+pub fn revoke_access_token(access_token: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut params = HashMap::new();
     params.insert("token", access_token);
     params.insert("token_type_hint", "access_token");

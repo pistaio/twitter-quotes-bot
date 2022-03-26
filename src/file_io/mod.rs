@@ -27,8 +27,7 @@ pub fn generate_combined_quotes_markdown(chapter_paths: Vec<String>) {
         quotes.append(&mut read_chapter_quotes(&chapter_path));
     }
 
-    write_quotes_to_markdown(quotes.to_owned())
-        .unwrap_or_else(|err| println!("{:?}", err));
+    write_quotes_to_markdown(quotes.clone());
 }
 
 
@@ -38,12 +37,11 @@ pub fn remove_quote_from_markdown(quote: String) {
 
     // Remove quote from file
     quotes.retain(|x| *x != quote);
-    write_quotes_to_markdown(quotes)
-        .unwrap_or_else(|err| println!("{:?}", err));
+    write_quotes_to_markdown(quotes);
 }
 
 
-fn write_quotes_to_markdown(quotes: Vec<String>) -> std::io::Result<()> {
+fn write_quotes_to_markdown(quotes: Vec<String>) {
     let mut file = File::create("data/processed/quotes.md").expect("Unable to create file");
 
     for quote in quotes {
@@ -51,7 +49,6 @@ fn write_quotes_to_markdown(quotes: Vec<String>) -> std::io::Result<()> {
             writeln!(&mut file, "{}\n", quote).unwrap();
         }
     }
-    Ok(())
 }
 
 
