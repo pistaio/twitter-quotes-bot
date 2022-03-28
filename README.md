@@ -1,6 +1,6 @@
 # Twitter Quotes Bot
 
-This repo contains a Rust script that posts quotes from a markdown file to Twitter.
+This repo contains a Rust script that extracts quotes from a markdown file, collates, and randomly posts them to Twitter.
 
 ## Functionality
 
