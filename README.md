@@ -10,3 +10,10 @@ This repo contains a Rust script that posts quotes from a markdown file to Twitt
     - Remove quote from generated md file after tweets are posted
 - Automatically refresh access token (confidential client flow)
 - Test suite
+
+## Setup
+
+- Add your markdown file from which quotes need to be extracted to `data/original/`. (multiple files are also supported)
+- Update the filename(s) in `process_chapter_markdowns()` in `main.rs`
+- Add Twitter credentials (client ID, client secret, and callback URL) in `twitter_io/constants.rs`
+- Run the code using `cargo run`
